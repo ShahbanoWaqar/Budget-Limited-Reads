@@ -25,6 +25,9 @@ class Policy {
   virtual bool try_hedge(const LogicalRead& read, const IoBackend& backend,
                          uint64_t now_ns) = 0;
 
+  virtual bool uses_permits() const { return false; }
+  virtual uint64_t hedge_delay_ns() const { return UINT64_MAX; }
+
   // Called after both replica reads of a pair have completed and been cleaned up.
   virtual void on_pair_drained(const LogicalRead& read) = 0;
 };

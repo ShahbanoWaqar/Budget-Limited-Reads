@@ -31,6 +31,7 @@ class IoBackend {
   virtual ~IoBackend() = default;
 
   // Returns false if the request could not be queued (e.g. outstanding cap).
+  // Any exception must occur before exposing the buffer to asynchronous I/O.
   virtual bool submit(const ReadSubmission& req) = 0;
 
   // Appends finished operations to `out`; returns how many were appended.

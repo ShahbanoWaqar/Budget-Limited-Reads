@@ -2,7 +2,9 @@
 
 #include <cstdint>
 #include <optional>
-#include <vector>
+#include <new>
+#include <memory>
+#include <stdexcept>
 
 #include "engine/io_backend.h"
 
@@ -20,13 +22,20 @@ enum class State {
   Drained           // every replica read of this logical read has completed
 };
 
+struct FreeBuffer {
+  void operator()(uint8_t* p) const { ::operator delete(p, std::align_val_t{4096}); }
+};
 struct ReplicaRead {
   ReplicaId id = 0;
   Drive drive = Drive::A;
-  std::vector<uint8_t> buffer;  // separate buffer per replica read
+  std::unique_ptr<uint8_t, FreeBuffer> buffer;
+  void allocate(size_t length) {
+    buffer.reset(static_cast<uint8_t*>(::operator new(length, std::align_val_t{4096})));
+  }
   uint64_t submit_ns = 0;
   uint64_t complete_ns = 0;
   bool done = false;
+  bool verified = false;
   int64_t result = 0;  // bytes read or -errno
 };
 
@@ -40,6 +49,9 @@ struct LogicalRead {
   std::optional<ReplicaRead> duplicate;  // never more than one
   bool answered = false;
   bool holds_permit = false;
+  bool hedge_denied = false;
+  uint64_t answer_ns = 0;
+  ReplicaId winner = 0;
 };
 
 }  // namespace blr

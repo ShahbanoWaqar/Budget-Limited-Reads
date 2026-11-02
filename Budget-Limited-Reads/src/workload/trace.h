@@ -14,7 +14,7 @@ struct TraceEntry {
 };
 
 // CSV: arrival_ns,offset,length
-// TODO: implement; return false on malformed input.
+// Returns false on malformed input; leaves output unchanged on failure.
 bool load_trace(const std::string& path, std::vector<TraceEntry>& out);
 bool save_trace(const std::string& path, const std::vector<TraceEntry>& trace);
 

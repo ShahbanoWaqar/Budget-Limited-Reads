@@ -4,6 +4,7 @@
 #include <string>
 
 #include "mirror/request.h"
+#include "accounting/counters.h"
 
 namespace blr {
 
@@ -13,11 +14,13 @@ class Logger {
  public:
   bool open(const std::string& logical_path, const std::string& replica_path);
 
-  // TODO: finalize columns (ids, timestamps, drive, outcome, winner, permit state).
+  bool open_activity(const std::string& path);
+  void log_activity(uint64_t now_ns, const Counters& counters);
   void log_logical(const LogicalRead& read, bool ok);
   void log_replica(LogicalId logical, const ReplicaRead& replica, bool winner);
 
  private:
+  std::ofstream activity_;
   std::ofstream logical_;
   std::ofstream replica_;
 };

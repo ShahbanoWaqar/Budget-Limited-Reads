@@ -10,14 +10,14 @@ Drive HedgeBudget::choose_primary(const IoBackend& backend) {
 
 bool HedgeBudget::try_hedge(const LogicalRead& read, const IoBackend& backend,
                             uint64_t now_ns) {
-  if (read.duplicate.has_value()) return false;
-  if (now_ns < read.primary.submit_ns + delay_ns_) return false;
+  if (read.answered || read.primary.done || read.duplicate.has_value()) return false;
+  if (now_ns < read.primary.submit_ns || now_ns - read.primary.submit_ns < delay_ns_) return false;
   if (active_ >= permits_) return false;
   if (use_threshold_ &&
       backend.outstanding(other(read.primary.drive)) >= threshold_) {
     return false;
   }
-  // TODO: also require that the primary is still unfinished.
+
   ++active_;
   return true;
 }

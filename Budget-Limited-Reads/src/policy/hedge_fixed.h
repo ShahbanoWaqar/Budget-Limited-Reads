@@ -11,6 +11,7 @@ class HedgeFixed : public Policy {
   explicit HedgeFixed(uint64_t hedge_delay_ns) : delay_ns_(hedge_delay_ns) {}
 
   const char* name() const override { return "hedge-fixed"; }
+  uint64_t hedge_delay_ns() const override { return delay_ns_; }
   Drive choose_primary(const IoBackend& backend) override;
   bool try_hedge(const LogicalRead& read, const IoBackend& backend,
                  uint64_t now_ns) override;

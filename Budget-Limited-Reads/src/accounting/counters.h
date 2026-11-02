@@ -7,6 +7,11 @@ namespace blr {
 // Logical results are counted separately from every replica read, including
 // losing reads that finish after the answer was returned.
 struct Counters {
+  uint64_t outstanding[2] = {0, 0};
+  uint64_t peak_outstanding = 0;
+  uint64_t active_pair_permits = 0;
+  uint64_t peak_pair_permits = 0;
+
   uint64_t logical_submitted = 0;
   uint64_t logical_succeeded = 0;
   uint64_t logical_failed = 0;

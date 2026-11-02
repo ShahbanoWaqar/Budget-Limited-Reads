@@ -18,11 +18,13 @@ class HedgeBudget : public Policy {
         use_threshold_(use_threshold) {}
 
   const char* name() const override { return "hedge-budget"; }
+  uint64_t hedge_delay_ns() const override { return delay_ns_; }
   Drive choose_primary(const IoBackend& backend) override;
   bool try_hedge(const LogicalRead& read, const IoBackend& backend,
                  uint64_t now_ns) override;
   void on_pair_drained(const LogicalRead& read) override;
 
+  bool uses_permits() const override { return true; }
   unsigned active_permits() const { return active_; }
 
  private:

@@ -1,0 +1,8 @@
+build*/
+*.logical.csv
+*.replica.csv
+*.activity.csv
+dist/
+bin/
+__pycache__/
+*.pyc

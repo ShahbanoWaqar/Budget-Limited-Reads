@@ -1,97 +1,106 @@
 # Budget-Limited Duplicate Reads on Mirrored Disks
 
-CSC 720 Storage Systems, Project 04. A read-only mirrored-file prototype that
-compares hedged (duplicate) reads against no-duplicate baselines, with a bounded
-pool of hedge-pair permits.
+CSC 720 Storage Systems, Project 04. A read-only mirrored-file prototype comparing
+round-robin, less-busy-first, fixed-delay hedging, and budget-limited hedging.
+See [DESIGN.md](DESIGN.md) for request lifetime, hedging, and accounting details.
 
-Research question: can a limit on simultaneous hedged request pairs preserve
-useful latency reductions while avoiding excessive duplicate I/O?
+Windows 11 is supported natively, including real file reads. See
+[WINDOWS.md](WINDOWS.md) for build instructions and PowerShell examples.
+For the Windows machine with separate D: and E: HDDs, run
+`run_windows_hdds.cmd` or `bin\blr_hdd.exe` when using a binary distribution.
+It creates new test files on each HDD and runs all four modes automatically.
 
-## Dependencies
+## Build and test
 
-| Need | Version | Where |
-|------|---------|-------|
-| C++ compiler (C++17) | g++ 9+ or clang 10+ | all platforms |
-| CMake | 3.16+ | all platforms |
-| make or ninja | any recent | all platforms |
-| pkg-config | any | Linux (locates liburing) |
-| liburing (`liburing-dev`) | 2.x recommended | Linux only |
-| Linux kernel | 5.6+ recommended (`io_uring` read opcodes; 5.1 minimum) | Linux only |
-| Bash | 4+ | scripts |
-| Python 3 + matplotlib, pandas | optional | plotting in `analysis/` |
+Requires a C++17 compiler and CMake 3.16+. Python 3 enables the CLI integration
+test. Linux disk I/O additionally requires pkg-config and liburing development
+headers (`sudo apt install build-essential cmake pkg-config liburing-dev`).
+Windows uses native overlapped file I/O and does not need liburing.
+macOS automatically builds the simulator only.
 
-Testing framework: none. `tests/test_main.cpp` is a small self-contained
-assert-based runner, registered with CTest. No external test dependency.
+```sh
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug -DBLR_SANITIZERS=ON
+cmake --build build -j
+ctest --test-dir build --output-on-failure
+```
 
-Hardware for the real experiments: two separate physical drives (HDDs
-preferred) holding identical, immutable test files. Two files on one physical
-drive are not a valid substitute.
+Use `-DBLR_ENABLE_URING=OFF` for simulator-only builds on Linux. Disable
+`BLR_SANITIZERS` for performance runs. Tests use explicit checks even in Release
+builds. Binaries: `blr`, `gen_trace`, `gen_data`, and `blr_tests`.
 
-### Install dependencies
+## Run a portable demonstration
 
-Debian/Ubuntu:
+```sh
+./build/gen_trace 1048576 100 1 42 /tmp/blr-trace.csv
+./build/blr --fake --mode budget --trace /tmp/blr-trace.csv \
+  --delay-us 10 --permits 1 --threshold 8 --max-outstanding 16 \
+  --out-prefix /tmp/blr-budget
+```
 
-    sudo apt install build-essential cmake pkg-config liburing-dev
+Choose `--mode rr`, `lessbusy`, `fixed`, or `budget`. The simulator defaults to
+200 microseconds on A and 50 on B; set `--fake-a-us` and `--fake-b-us` to change
+these. Virtual time advances in 1 microsecond steps while requests are active.
+The simulator generates the expected bytes; it does not read disk files or
+provide disk-performance evidence.
 
-Fedora/RHEL:
+## Real files and Linux io_uring
 
-    sudo dnf install gcc-c++ cmake make pkgconf-pkg-config liburing-devel
+`gen_data` creates the deterministic bytes required by verification and refuses
+to overwrite an existing file. Generate the same size on two separately mounted
+physical drives using dedicated test-file paths:
 
-macOS (fake backend and unit tests only; `io_uring` does not exist on macOS):
+```sh
+./build/gen_data 1073741824 /mnt/driveA/blr-test.bin
+./build/gen_data 1073741824 /mnt/driveB/blr-test.bin
+./build/gen_trace 1073741824 100 10 42 /tmp/blr-disk-trace.csv
+./build/blr --mode budget --trace /tmp/blr-disk-trace.csv \
+  --file-a /mnt/driveA/blr-test.bin --file-b /mnt/driveB/blr-test.bin \
+  --delay-us 1000 --permits 4 --threshold 16 --max-outstanding 128 \
+  --out-prefix /tmp/blr-disk
+```
 
-    xcode-select --install
-    brew install cmake
+The engine opens both files read-only with `O_DIRECT`, uses a normal io_uring
+ring, and never cancels losing reads. Buffers, offsets, and lengths are aligned
+to 4096 bytes. Files must remain immutable, contain the generator's known data,
+and cover every offset in the trace. Arbitrary identical files will fail byte
+verification. Two files on the same disk do not validate a two-drive experiment.
 
-## Build
+## Trace and logging contracts
 
-Linux (full build, includes the `io_uring` backend):
+Trace CSV has the exact header `arrival_ns,offset,length`. Entries must have
+nondecreasing arrival times, aligned offsets, and length 4096. The generator
+creates seeded uniform random offsets with evenly spaced arrivals; it is not a
+Poisson arrival generator. All comparison modes can replay the same saved file.
+When the physical cap is full, arrivals wait and are retried. Logical latency
+includes this waiting time; hedge delay starts at actual primary submission.
 
-    cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
-    cmake --build build -j
-    ctest --test-dir build --output-on-failure
+Each run creates three CSVs:
 
-macOS (the `io_uring` backend is skipped automatically):
+- `PREFIX.logical.csv`: exactly one answer per accepted logical request,
+  including scheduled arrival, answer, latency, success, winning ID, duplication,
+  and whether the answer was returned while holding a pair permit.
+- `PREFIX.replica.csv`: every completed replica, including losers, with IDs,
+  drive (0=A, 1=B), observed submission/completion times, byte count or negative
+  errno, verification outcome, and winner flag.
+- `PREFIX.activity.csv`: event-loop snapshots when issued/completed totals change,
+  with outstanding operations per drive, active permits, and operation totals.
+  Snapshots can combine several events; they are not a per-kernel-event trace.
 
-    cmake -S . -B build
-    cmake --build build -j
-    ctest --test-dir build --output-on-failure
+Completion times are when the polling loop observes completion. The console
+reports final logical/replica counts, bytes, duplicate wins, peak outstanding
+reads, peak pair permits, and total answer-to-loser-cleanup time. Exit codes:
+0=all logical reads succeeded, 1=configuration/setup failure, 2=logical failures.
+A replica failure includes an I/O error, short read, or content mismatch.
+A denied-duplicate count records each request at most once for a policy denial;
+physical-cap stalls are retried without incrementing this count.
 
-Binaries land in `build/`: `blr` (the engine), `gen_trace` (trace generator)
-and `blr_tests`.
+## Tests and experiment scripts
 
-## Running the experiments (outline, Linux only)
+The core test runner covers completion races, failed and corrupt reads, buffer
+lifetime, permit exhaustion, submission failures, and shutdown. The Python CLI
+test checks all four modes and reconciles generated CSV logs. Windows builds
+also include native file-I/O tests and the HDD launcher's help test.
 
-1. Mount the two drives and create identical test files: `scripts/make_testfiles.sh`.
-2. Generate arrival traces with `build/gen_trace`.
-3. Calibrate candidate hedge delays: `scripts/calibrate_delay.sh`.
-4. Run the studies: `scripts/run_study_A.sh`, `run_study_B.sh`, `run_study_C.sh`
-   (at least 3 repetitions of each principal comparison).
-5. Plot from the logs in `results/` using the scripts in `analysis/`.
-
-The scripts and the CLI are stubs for now.
-
-## Layout
-
-| Path | Contents |
-|------|----------|
-| `src/engine/` | `IoBackend` interface, `io_uring` backend (Linux), fake backend (tests) |
-| `src/mirror/` | Logical/replica request state machine, mirrored reader, data verification |
-| `src/policy/` | Primary selectors, no-duplicate, fixed-delay and budget-limited policies |
-| `src/accounting/` | Logical vs. replica counters, CSV logging |
-| `src/workload/` | Arrival-trace loading and generation |
-| `tests/` | Buffer lifetime, completion race, failure, full pool and shutdown tests |
-| `scripts/` | Test-file creation, interference, delay calibration, studies A/B/C |
-| `analysis/`, `results/`, `report/` | Plots, raw logs, IEEE/ACM report |
-
-## Modes
-
-1. No duplicate, round-robin
-2. No duplicate, less-busy first
-3. Fixed-delay duplication (same total physical-I/O cap)
-4. Budget-limited duplication (pair permits + alternate-drive threshold)
-
-## Safety rules
-
-- Use only approved test files; never touch a live mirror.
-- Never free or reuse a buffer while its read may still write into it.
-- Losing reads are not cancelled; they are drained and counted.
+The Bash study scripts in `scripts/` remain unimplemented. The Windows HDD
+launcher provides a single four-mode functional comparison. Repeated runs,
+background interference, delay calibration, and plotting are separate tasks.
