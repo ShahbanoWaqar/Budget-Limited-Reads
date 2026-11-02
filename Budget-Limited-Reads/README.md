@@ -7,6 +7,19 @@ pool of hedge-pair permits.
 Research question: can a limit on simultaneous hedged request pairs preserve
 useful latency reductions while avoiding excessive duplicate I/O?
 
+## Status
+
+| Component | State |
+|-----------|-------|
+| Verification (`src/mirror/verify.*`, `pattern.h`) | Done. Expected content is an offset-derived pattern, so any range can be checked without a checksum table. |
+| Mirror reader, no duplicates (`src/mirror/mirror_reader.*`) | Done. Primary read, verify, answer once, drain, free buffers. Reads the backend rejects are queued, not dropped. |
+| Fake backend (`src/engine/fake_backend.*`) | Done. Simulated time, per-drive latency, injected failures and corruption, outstanding cap. |
+| Hedge path in the reader (calls `Policy::try_hedge`, sets `holds_permit`) | Not started. Tests that need duplicate reads are placeholders in `tests/test_main.cpp`. |
+| `io_uring` backend, CLI (`blr`), scripts, analysis | Stubs. |
+
+Test files must use the pattern in `src/mirror/pattern.h` so the verifier accepts
+them; the planned `make_testfiles.sh` / generator must call the same code.
+
 ## Dependencies
 
 | Need | Version | Where |

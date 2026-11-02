@@ -1,0 +1,109 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1100 740" width="1100" height="740" font-family="Helvetica, Arial, sans-serif">
+  <defs>
+    <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#475569"/>
+    </marker>
+  </defs>
+  <rect width="1100" height="740" fill="#ffffff"/>
+  <text x="40" y="34" font-size="20" font-weight="700" fill="#0f172a">Budget-Limited Reads: code structure</text>
+
+  <!-- Row 1 -->
+  <rect x="40" y="60" width="220" height="60" rx="8" fill="#f1f5f9" stroke="#64748b"/>
+  <text x="150" y="86" text-anchor="middle" font-size="14" font-weight="700" fill="#0f172a">src/main.cpp</text>
+  <text x="150" y="105" text-anchor="middle" font-size="12" fill="#334155">CLI: mode, trace, delay, permits</text>
+
+  <rect x="300" y="60" width="300" height="60" rx="8" fill="#f1f5f9" stroke="#64748b"/>
+  <text x="450" y="86" text-anchor="middle" font-size="14" font-weight="700" fill="#0f172a">workload/</text>
+  <text x="450" y="105" text-anchor="middle" font-size="12" fill="#334155">TraceEntry · load/save_trace · gen_trace</text>
+
+  <rect x="640" y="60" width="200" height="60" rx="8" fill="#fef3c7" stroke="#b45309"/>
+  <text x="740" y="86" text-anchor="middle" font-size="14" font-weight="700" fill="#0f172a">scripts/</text>
+  <text x="740" y="105" text-anchor="middle" font-size="12" fill="#334155">drive blr: studies · interference</text>
+
+  <rect x="880" y="60" width="180" height="60" rx="8" fill="#fef3c7" stroke="#b45309"/>
+  <text x="970" y="86" text-anchor="middle" font-size="14" font-weight="700" fill="#0f172a">tests/</text>
+  <text x="970" y="105" text-anchor="middle" font-size="12" fill="#334155">9 scenarios, FakeBackend</text>
+
+  <line x1="300" y1="90" x2="262" y2="90" stroke="#475569" stroke-width="1.6" marker-end="url(#arr)"/>
+
+  <!-- mirror/ -->
+  <rect x="40" y="180" width="480" height="210" rx="10" fill="#eff6ff" stroke="#2563eb"/>
+  <text x="60" y="206" font-size="15" font-weight="700" fill="#1e3a8a">mirror/  (core)</text>
+  <rect x="60" y="226" width="440" height="56" rx="6" fill="#ffffff" stroke="#2563eb"/>
+  <text x="280" y="250" text-anchor="middle" font-size="13" font-weight="700" fill="#0f172a">MirrorReader</text>
+  <text x="280" y="269" text-anchor="middle" font-size="12" fill="#334155">submit · run_once · drain  (first valid result wins, exactly once)</text>
+  <rect x="60" y="296" width="215" height="76" rx="6" fill="#ffffff" stroke="#2563eb"/>
+  <text x="167" y="320" text-anchor="middle" font-size="13" font-weight="700" fill="#0f172a">request.h</text>
+  <text x="167" y="340" text-anchor="middle" font-size="12" fill="#334155">LogicalRead · ReplicaRead</text>
+  <text x="167" y="358" text-anchor="middle" font-size="10" fill="#334155">Primary→Eligible→Pair→Answered→Drained</text>
+  <rect x="285" y="296" width="215" height="76" rx="6" fill="#ffffff" stroke="#2563eb"/>
+  <text x="392" y="320" text-anchor="middle" font-size="13" font-weight="700" fill="#0f172a">verify</text>
+  <text x="392" y="340" text-anchor="middle" font-size="12" fill="#334155">size + byte check</text>
+  <text x="392" y="358" text-anchor="middle" font-size="11" fill="#334155">failed read never counts as success</text>
+
+  <!-- policy/ -->
+  <rect x="580" y="180" width="480" height="210" rx="10" fill="#f0fdf4" stroke="#16a34a"/>
+  <text x="600" y="206" font-size="15" font-weight="700" fill="#14532d">policy/  (the experiment variable)</text>
+  <text x="600" y="226" font-size="12" fill="#334155">Policy: choose_primary · try_hedge · on_pair_drained</text>
+  <rect x="600" y="240" width="205" height="52" rx="6" fill="#ffffff" stroke="#16a34a"/>
+  <text x="702" y="262" text-anchor="middle" font-size="13" font-weight="700" fill="#0f172a">NoDupRoundRobin</text>
+  <text x="702" y="280" text-anchor="middle" font-size="11" fill="#334155">baseline 1</text>
+  <rect x="835" y="240" width="205" height="52" rx="6" fill="#ffffff" stroke="#16a34a"/>
+  <text x="937" y="262" text-anchor="middle" font-size="13" font-weight="700" fill="#0f172a">NoDupLessBusy</text>
+  <text x="937" y="280" text-anchor="middle" font-size="11" fill="#334155">baseline 2 · shared primary rule</text>
+  <rect x="600" y="306" width="205" height="62" rx="6" fill="#ffffff" stroke="#16a34a"/>
+  <text x="702" y="328" text-anchor="middle" font-size="13" font-weight="700" fill="#0f172a">HedgeFixed</text>
+  <text x="702" y="346" text-anchor="middle" font-size="11" fill="#334155">fixed delay, max 1 duplicate</text>
+  <rect x="835" y="306" width="205" height="62" rx="6" fill="#ffffff" stroke="#16a34a"/>
+  <text x="937" y="328" text-anchor="middle" font-size="13" font-weight="700" fill="#0f172a">HedgeBudget</text>
+  <text x="937" y="346" text-anchor="middle" font-size="11" fill="#334155">permits + alt-drive threshold</text>
+
+  <!-- accounting/ -->
+  <rect x="40" y="440" width="480" height="100" rx="10" fill="#faf5ff" stroke="#9333ea"/>
+  <text x="60" y="466" font-size="15" font-weight="700" fill="#581c87">accounting/</text>
+  <rect x="60" y="480" width="215" height="44" rx="6" fill="#ffffff" stroke="#9333ea"/>
+  <text x="167" y="499" text-anchor="middle" font-size="13" font-weight="700" fill="#0f172a">Counters</text>
+  <text x="167" y="515" text-anchor="middle" font-size="11" fill="#334155">logical vs. all replica reads</text>
+  <rect x="285" y="480" width="215" height="44" rx="6" fill="#ffffff" stroke="#9333ea"/>
+  <text x="392" y="499" text-anchor="middle" font-size="13" font-weight="700" fill="#0f172a">Logger</text>
+  <text x="392" y="515" text-anchor="middle" font-size="11" fill="#334155">CSV: logical + replica rows</text>
+
+  <!-- engine/ -->
+  <rect x="580" y="440" width="480" height="150" rx="10" fill="#fff7ed" stroke="#ea580c"/>
+  <text x="600" y="466" font-size="15" font-weight="700" fill="#7c2d12">engine/</text>
+  <text x="600" y="486" font-size="12" fill="#334155">IoBackend: submit · poll · outstanding(drive)</text>
+  <rect x="600" y="504" width="205" height="62" rx="6" fill="#ffffff" stroke="#ea580c"/>
+  <text x="702" y="527" text-anchor="middle" font-size="13" font-weight="700" fill="#0f172a">FakeBackend</text>
+  <text x="702" y="546" text-anchor="middle" font-size="11" fill="#334155">any OS · unit tests</text>
+  <rect x="835" y="504" width="205" height="62" rx="6" fill="#ffffff" stroke="#ea580c"/>
+  <text x="937" y="527" text-anchor="middle" font-size="13" font-weight="700" fill="#0f172a">UringBackend</text>
+  <text x="937" y="546" text-anchor="middle" font-size="11" fill="#334155">Linux · liburing · real I/O</text>
+
+  <!-- drives -->
+  <rect x="700" y="650" width="140" height="50" rx="8" fill="#e2e8f0" stroke="#475569"/>
+  <text x="770" y="680" text-anchor="middle" font-size="14" font-weight="700" fill="#0f172a">Drive A file</text>
+  <rect x="880" y="650" width="140" height="50" rx="8" fill="#e2e8f0" stroke="#475569"/>
+  <text x="950" y="680" text-anchor="middle" font-size="14" font-weight="700" fill="#0f172a">Drive B file</text>
+
+  <!-- arrows -->
+  <line x1="150" y1="120" x2="150" y2="178" stroke="#475569" stroke-width="1.6" marker-end="url(#arr)"/>
+  <text x="158" y="152" font-size="10" fill="#475569">replays trace</text>
+
+  <line x1="520" y1="260" x2="578" y2="260" stroke="#475569" stroke-width="1.6" marker-end="url(#arr)"/>
+  <text x="549" y="250" text-anchor="middle" font-size="10" fill="#475569">asks</text>
+
+  <line x1="280" y1="390" x2="280" y2="438" stroke="#475569" stroke-width="1.6" marker-end="url(#arr)"/>
+  <text x="288" y="418" font-size="10" fill="#475569">counts + logs</text>
+
+  <path d="M 520 340 L 550 340 L 550 535 L 578 535" fill="none" stroke="#475569" stroke-width="1.6" marker-end="url(#arr)"/>
+  <text x="544" y="420" text-anchor="end" font-size="10" fill="#475569">submit / poll</text>
+
+  <line x1="820" y1="390" x2="820" y2="438" stroke="#475569" stroke-width="1.6" marker-end="url(#arr)"/>
+  <text x="828" y="418" font-size="10" fill="#475569">reads outstanding(drive)</text>
+
+  <line x1="900" y1="590" x2="780" y2="648" stroke="#475569" stroke-width="1.6" marker-end="url(#arr)"/>
+  <line x1="960" y1="590" x2="950" y2="648" stroke="#475569" stroke-width="1.6" marker-end="url(#arr)"/>
+
+  <text x="40" y="640" font-size="12" fill="#334155">Losing reads are not cancelled: they drain, are counted, and release the</text>
+  <text x="40" y="658" font-size="12" fill="#334155">hedge permit only when both copies of the pair have finished.</text>
+</svg>

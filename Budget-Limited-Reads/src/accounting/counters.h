@@ -13,7 +13,8 @@ struct Counters {
 
   uint64_t replica_issued = 0;
   uint64_t replica_completed = 0;
-  uint64_t replica_failed = 0;
+  uint64_t replica_failed = 0;   // I/O error, short read, or verify failure
+  uint64_t verify_failed = 0;    // full-size read whose bytes were wrong (subset of replica_failed)
   uint64_t replica_bytes = 0;
 
   uint64_t duplicates_issued = 0;
