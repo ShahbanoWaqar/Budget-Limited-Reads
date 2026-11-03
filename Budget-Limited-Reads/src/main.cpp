@@ -36,13 +36,15 @@ int main(int argc, char** argv) {
       auto n=std::stoull(s); if(n>1000000000ULL) throw std::runtime_error("option too large: "+k);
       return static_cast<uint64_t>(n);
     };
-    if (!opt.count("--mode") || !opt.count("--trace")) throw std::runtime_error("usage: blr --mode rr|lessbusy|fixed|budget --trace CSV [--fake | --file-a A --file-b B] [--delay-us N --permits N --threshold N --max-outstanding N --out-prefix PATH --no-threshold]");
+    if (!opt.count("--mode") || !opt.count("--trace")) throw std::runtime_error("usage: blr --mode rr|lessbusy|fixed|budget|a|b --trace CSV [--fake | --file-a A --file-b B] [--delay-us N --permits N --threshold N --max-outstanding N --out-prefix PATH --no-threshold]");
     size_t cap=number("--max-outstanding",128); if (!cap) throw std::runtime_error("cap must be positive");
     auto delay=number("--delay-us",50)*1000;
     std::unique_ptr<blr::Policy> policy;
     auto mode=opt["--mode"];
     if(mode=="rr") policy=std::make_unique<blr::NoDupRoundRobin>();
     else if(mode=="lessbusy") policy=std::make_unique<blr::NoDupLessBusy>();
+    else if(mode=="a") policy=std::make_unique<blr::NoDupSingleDrive>(blr::Drive::A);
+    else if(mode=="b") policy=std::make_unique<blr::NoDupSingleDrive>(blr::Drive::B);
     else if(mode=="fixed") policy=std::make_unique<blr::HedgeFixed>(delay);
     else if(mode=="budget") policy=std::make_unique<blr::HedgeBudget>(delay,number("--permits",4),number("--threshold",16),!opt.count("--no-threshold"));
     else throw std::runtime_error("unknown mode");

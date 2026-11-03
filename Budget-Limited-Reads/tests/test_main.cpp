@@ -116,6 +116,13 @@ int main() {
       ReadSubmission req{1,Drive::A,0,4096,data}; CHECK(b.submit(req)); CHECK(lb.choose_primary(b)==Drive::B);
       b.set_time(100000); std::vector<ReadCompletion> done; b.poll(done);
     }},
+    {"single_drive_policy_uses_one_drive_and_never_hedges", [] {
+      FakeBackend b; Counters c; NoDupSingleDrive p(Drive::B); MirrorReader r(b,p,c);
+      for(int i=0;i<4;++i) CHECK(r.submit(i*4096,4096,0));
+      CHECK(b.outstanding(Drive::B)==4 && b.outstanding(Drive::A)==0);
+      b.set_time(1000000); r.run_once(1000000); r.drain();
+      CHECK(c.duplicates_issued==0 && c.replica_issued==4 && c.logical_succeeded==4);
+    }},
     {"primary_setup_exception_preserves_shutdown", [] {
       ThrowingBackend b; Counters c; HedgeBudget p(0,1,10); MirrorReader r(b,p,c);
       bool threw=false;

@@ -1,0 +1,58 @@
+--- a/src/policy/selector.h	2026-11-03 00:45:21.669530516 +0000
++++ b/src/policy/selector.h	2026-11-03 00:45:22.123811580 +0000
+@@ -28,6 +28,20 @@
+   int next_ = 0;
+ };
+ 
++// Single-drive reference: every read goes to one fixed drive, no duplicates.
++// Used to measure each drive alone (Study A).
++class NoDupSingleDrive : public Policy {
++ public:
++  explicit NoDupSingleDrive(Drive d) : drive_(d) {}
++  const char* name() const override { return drive_ == Drive::A ? "single-A" : "single-B"; }
++  Drive choose_primary(const IoBackend&) override { return drive_; }
++  bool try_hedge(const LogicalRead&, const IoBackend&, uint64_t) override { return false; }
++  void on_pair_drained(const LogicalRead&) override {}
++
++ private:
++  Drive drive_;
++};
++
+ // Shared primary-selection rule used by the hedging policies.
+ Drive choose_less_busy(const IoBackend& backend, int& rr_state);
+ 
+--- a/src/main.cpp	2026-11-03 00:45:21.668833408 +0000
++++ b/src/main.cpp	2026-11-03 00:45:22.123923364 +0000
+@@ -36,13 +36,15 @@
+       auto n=std::stoull(s); if(n>1000000000ULL) throw std::runtime_error("option too large: "+k);
+       return static_cast<uint64_t>(n);
+     };
+-    if (!opt.count("--mode") || !opt.count("--trace")) throw std::runtime_error("usage: blr --mode rr|lessbusy|fixed|budget --trace CSV [--fake | --file-a A --file-b B] [--delay-us N --permits N --threshold N --max-outstanding N --out-prefix PATH --no-threshold]");
++    if (!opt.count("--mode") || !opt.count("--trace")) throw std::runtime_error("usage: blr --mode rr|lessbusy|fixed|budget|a|b --trace CSV [--fake | --file-a A --file-b B] [--delay-us N --permits N --threshold N --max-outstanding N --out-prefix PATH --no-threshold]");
+     size_t cap=number("--max-outstanding",128); if (!cap) throw std::runtime_error("cap must be positive");
+     auto delay=number("--delay-us",50)*1000;
+     std::unique_ptr<blr::Policy> policy;
+     auto mode=opt["--mode"];
+     if(mode=="rr") policy=std::make_unique<blr::NoDupRoundRobin>();
+     else if(mode=="lessbusy") policy=std::make_unique<blr::NoDupLessBusy>();
++    else if(mode=="a") policy=std::make_unique<blr::NoDupSingleDrive>(blr::Drive::A);
++    else if(mode=="b") policy=std::make_unique<blr::NoDupSingleDrive>(blr::Drive::B);
+     else if(mode=="fixed") policy=std::make_unique<blr::HedgeFixed>(delay);
+     else if(mode=="budget") policy=std::make_unique<blr::HedgeBudget>(delay,number("--permits",4),number("--threshold",16),!opt.count("--no-threshold"));
+     else throw std::runtime_error("unknown mode");
+--- a/tests/test_main.cpp	2026-11-03 00:45:21.670068211 +0000
++++ b/tests/test_main.cpp	2026-11-03 00:45:22.124088990 +0000
+@@ -116,6 +116,13 @@
+       ReadSubmission req{1,Drive::A,0,4096,data}; CHECK(b.submit(req)); CHECK(lb.choose_primary(b)==Drive::B);
+       b.set_time(100000); std::vector<ReadCompletion> done; b.poll(done);
+     }},
++    {"single_drive_policy_uses_one_drive_and_never_hedges", [] {
++      FakeBackend b; Counters c; NoDupSingleDrive p(Drive::B); MirrorReader r(b,p,c);
++      for(int i=0;i<4;++i) CHECK(r.submit(i*4096,4096,0));
++      CHECK(b.outstanding(Drive::B)==4 && b.outstanding(Drive::A)==0);
++      b.set_time(1000000); r.run_once(1000000); r.drain();
++      CHECK(c.duplicates_issued==0 && c.replica_issued==4 && c.logical_succeeded==4);
++    }},
+     {"primary_setup_exception_preserves_shutdown", [] {
+       ThrowingBackend b; Counters c; HedgeBudget p(0,1,10); MirrorReader r(b,p,c);
+       bool threw=false;
